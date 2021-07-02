@@ -1,0 +1,4 @@
+#Ignore binary files
+Debug/
+Debug/Core/
+Debug/Drivers/
