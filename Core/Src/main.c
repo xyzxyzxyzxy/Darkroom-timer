@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <math.h>
 #include "7seg.h"
 /* USER CODE END Includes */
 
@@ -92,7 +93,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 // char readKey(void);
-void displayDigit(int);
+void displayNumber(int);
 void displayChar(char);
 /* USER CODE END PFP */
 
@@ -144,12 +145,12 @@ num = 0;
 
   while (1)
   {
-	  //HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
-	  //HAL_Delay(100);
-	 if (num != 0) {
-		 displayDigit(num);
-	 } else if (key != '\0') {
+	 if ((int)key > 64) {
 		 displayChar(key);
+		 HAL_Delay(100);
+		 key = '\0';
+	 } else {
+		displayNumber(num);
 	 }
   }
     /* USER CODE END WHILE */
@@ -296,7 +297,7 @@ static void MX_GPIO_Init(void)
                           |GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
                           |GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
                           |GPIO_PIN_7, GPIO_PIN_RESET);
 
@@ -328,10 +329,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD15 PD0 PD1 PD2
+  /*Configure GPIO pins : PD12 PD0 PD1 PD2
                            PD3 PD4 PD5 PD6
                            PD7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_15|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
+  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
                           |GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
                           |GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -340,10 +341,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
@@ -351,6 +352,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
 	if (HAL_GetTick()-t0 > 115) {
 		rn = 1;
 		if (GPIO_Pin == GPIO_PIN_11) {
@@ -406,7 +408,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 			HAL_GPIO_WritePin(R4_PORT, R4_PIN, GPIO_PIN_RESET);
 		}
 		key = keypad[rn][cn];
-		if ((int)key <= 58 && (int)key >= 48) {
+		if ((int)key <= 58 && (int)key >= 48) { //a number between 0 and 9
 			  for (int i = 0; i < 50; ++i) {
 						  msg[i] = '\0';
 			  }
@@ -421,10 +423,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 			  for (int i = 0; i < 50; ++i) {
 					msg[i] = '\0';
 			  }
-			  num = 0;
 
-			  if (key == 'C') {
+			  if (key == 'C' && num > 0) {
+				  displayChar(key);
+				  HAL_Delay(500);
+				  key = '\0';
 				  HAL_TIM_Base_Start_IT(&htim6);
+
+			  } else if (key == 'D' && num > 0) {
+				  num /= 10;
 			  }
 
 			  sprintf(msg, "Key pressed: %c                   \r", key);
@@ -432,55 +439,74 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 		  }
 	}
 	t0 = HAL_GetTick();
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
 }
 
-void displayDigit(int n) {
-	int d[4] = {0, 0, 0, 0};
-	uint8_t k = 0;
-	d[0] = n % 10;
-	n /= 10;
-	k++;
-	while (n > 0) {
-		d[k] = n % 10;
-		n = n / 10;
+void displayNumber(int n) {
+	if (n >= 1) {
+		int ind = 0;
+		int n_digits = log10(n) + 1;
+
+		int d[4] = {0, 0, 0, 0};
+		uint8_t k = 0;
+		d[0] = n % 10;
+		n /= 10;
 		k++;
-	}
-	for (int i = 0; i < 4; ++i) {
-		HAL_Delay(2);
-		(*writeDigit[i])();
-		switch (d[3-i]) {
-		case 0:
-			print_0();
-			break;
-		case 1:
-			print_1();
-			break;
-		case 2:
-			print_2();
-			break;
-		case 3:
-			print_3();
-			break;
-		case 4:
-			print_4();
-			break;
-		case 5:
-			print_5();
-			break;
-		case 6:
-			print_6();
-			break;
-		case 7:
-			print_7();
-			break;
-		case 8:
-			print_8();
-			break;
-		case 9:
-			print_9();
-			break;
-		default:
-			break;
+		while (n > 0) {
+			d[k] = n % 10;
+			n = n / 10;
+			k++;
+		}
+
+		//disp remaining digits as off
+		for (ind = 0; ind < 4-n_digits; ++ind) {
+			HAL_Delay(2);
+			(*writeDigit[ind])();
+			print_OFF();
+		}
+		for (int i = ind; i < 4; ++i) {
+			HAL_Delay(2);
+			(*writeDigit[i])();
+			switch (d[3-i]) {
+			case 0:
+				print_0();
+				break;
+			case 1:
+				print_1();
+				break;
+			case 2:
+				print_2();
+				break;
+			case 3:
+				print_3();
+				break;
+			case 4:
+				print_4();
+				break;
+			case 5:
+				print_5();
+				break;
+			case 6:
+				print_6();
+				break;
+			case 7:
+				print_7();
+				break;
+			case 8:
+				print_8();
+				break;
+			case 9:
+				print_9();
+				break;
+			default:
+				break;
+			}
+		}
+	} else { //Number is < 1 log10 does not work.
+		for (int i = 0; i < 3; ++i) {
+			HAL_Delay(2);
+			(*writeDigit[i])();
+			print_OFF();
 		}
 	}
 }
@@ -604,10 +630,21 @@ void displayChar(char c) {
 //}
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
 	num--;
 	if (num == 0) {
 		HAL_TIM_Base_Stop_IT(&htim6);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
 	}
 }
 /* USER CODE END 4 */
