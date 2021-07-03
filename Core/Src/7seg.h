@@ -70,6 +70,34 @@ void print_C();
 
 void print_d();
 
+void print_E();
+
+void print_F();
+
+void print_H();
+
+void print_h();
+
+void print_J();
+
+void print_L();
+
+void print_n();
+
+void print_O();
+
+void print_o();
+
+void print_P();
+
+void print_r();
+
+void print_t();
+
+void print_u();
+
+void print_y();
+
 void print_decimal(); // writing the decimal point
 
 void print_OFF(); // turning all 7 segments plus the decimal point off

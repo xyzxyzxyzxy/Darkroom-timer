@@ -147,10 +147,11 @@ num = 0;
   {
 	 if ((int)key > 64) {
 		 displayChar(key);
-		 HAL_Delay(100);
+		 HAL_Delay(500);
 		 key = '\0';
+
 	 } else {
-		displayNumber(num);
+		 displayNumber(num);
 	 }
   }
     /* USER CODE END WHILE */
@@ -429,6 +430,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				  HAL_Delay(500);
 				  key = '\0';
 				  HAL_TIM_Base_Start_IT(&htim6);
+				  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+				  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
 
 			  } else if (key == 'D' && num > 0) {
 				  num /= 10;
@@ -644,7 +647,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
 		HAL_Delay(100);
 		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
-		//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+		for (int i = 0; i < 200; ++i) {
+			write_D1();
+			print_OFF();
+			HAL_Delay(2);
+			write_D2();
+			print_E();
+			HAL_Delay(2);
+			write_D3();
+			print_n();
+			HAL_Delay(2);
+			write_D4();
+			print_d();
+			HAL_Delay(2);
+		}
+		//RE enable interrupts from keyboard
+		HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 	}
 }
 /* USER CODE END 4 */
