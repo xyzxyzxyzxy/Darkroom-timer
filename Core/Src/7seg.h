@@ -98,6 +98,8 @@ void print_u();
 
 void print_y();
 
+void print_wait();
+
 void print_decimal(); // writing the decimal point
 
 void print_OFF(); // turning all 7 segments plus the decimal point off

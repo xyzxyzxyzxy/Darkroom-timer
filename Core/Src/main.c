@@ -79,11 +79,11 @@ char keypad[5][5] = {{'\0', '\0', '\0', '\0', '\0'},
 		{'\0', '*', '0', '#', 'D'}};
 
 uint32_t t0;
-int num;
-char key;
-char msg[50];
-int rn;
-int cn;
+static int num;
+static char key;
+static char msg[50];
+static int rn;
+static int cn;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,6 +95,7 @@ static void MX_TIM6_Init(void);
 // char readKey(void);
 void displayNumber(int);
 void displayChar(char);
+void displayWait(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -108,8 +109,8 @@ void displayChar(char);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-key = '\0';
-num = 0;
+  key = '\0';
+  num = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -145,13 +146,10 @@ num = 0;
 
   while (1)
   {
-	 if ((int)key > 64) {
-		 displayChar(key);
-		 HAL_Delay(500);
-		 key = '\0';
-
-	 } else {
+	 if (num > 0) {
 		 displayNumber(num);
+	 } else {
+		 displayWait();
 	 }
   }
     /* USER CODE END WHILE */
@@ -295,10 +293,10 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
-                          |GPIO_PIN_7, GPIO_PIN_RESET);
+                          |GPIO_PIN_7|GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
                           |GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
                           |GPIO_PIN_7, GPIO_PIN_RESET);
 
@@ -310,9 +308,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB11 PB4 PB5 PB6
-                           PB7 */
+                           PB7 PB9 */
   GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
-                          |GPIO_PIN_7;
+                          |GPIO_PIN_7|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -330,10 +328,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD12 PD0 PD1 PD2
+  /*Configure GPIO pins : PD13 PD0 PD1 PD2
                            PD3 PD4 PD5 PD6
                            PD7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
+  GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2
                           |GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
                           |GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -352,8 +350,43 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+void keyCheck(char key) {
+	if ((int)key <= 58 && (int)key >= 48) { //a number between 0 and 9
+		  for (int i = 0; i < 50; ++i) {
+					  msg[i] = '\0';
+		  }
+		  num = num * 10 + (int)key - 48;
+		  if (num > 9999) {
+			  num = (int)key-48;
+		  }
+		  sprintf(msg, "Key pressed: %d                   \r", num);
+		  HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg), HAL_MAX_DELAY);
+	  }
+	  else if ((int)key > 0) { // not \0
+		  for (int i = 0; i < 50; ++i) {
+				msg[i] = '\0';
+		  }
+		  if (key == 'C' && num > 0) {
+			  displayChar(key);
+			  HAL_Delay(500);
+			  key = '\0';
+
+			  HAL_TIM_Base_Start_IT(&htim6);
+			  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_9);
+			  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+			  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+
+		  } else if (key == 'D' && num > 0) {
+			  num /= 10;
+		  }
+
+		  sprintf(msg, "Key pressed: %c                   \r", key);
+		  HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg), HAL_MAX_DELAY);
+	  }
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 	if (HAL_GetTick()-t0 > 115) {
 		rn = 1;
 		if (GPIO_Pin == GPIO_PIN_11) {
@@ -409,41 +442,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 			HAL_GPIO_WritePin(R4_PORT, R4_PIN, GPIO_PIN_RESET);
 		}
 		key = keypad[rn][cn];
-		if ((int)key <= 58 && (int)key >= 48) { //a number between 0 and 9
-			  for (int i = 0; i < 50; ++i) {
-						  msg[i] = '\0';
-			  }
-			  num = num * 10 + (int)key - 48;
-			  if (num > 9999) {
-				  num = (int)key-48;
-			  }
-			  sprintf(msg, "Key pressed: %d                   \r", num);
-			  HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg), HAL_MAX_DELAY);
-		  }
-		  else if ((int)key > 0){
-			  for (int i = 0; i < 50; ++i) {
-					msg[i] = '\0';
-			  }
+		keyCheck(key);
 
-			  if (key == 'C' && num > 0) {
-				  displayChar(key);
-				  HAL_Delay(500);
-				  key = '\0';
-				  HAL_TIM_Base_Start_IT(&htim6);
-				  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-				  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
-
-			  } else if (key == 'D' && num > 0) {
-				  num /= 10;
-			  }
-
-			  sprintf(msg, "Key pressed: %c                   \r", key);
-			  HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg), HAL_MAX_DELAY);
-		  }
 	}
 	t0 = HAL_GetTick();
-	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 }
+
 
 void displayNumber(int n) {
 	if (n >= 1) {
@@ -541,6 +546,17 @@ void displayChar(char c) {
 		}
 	}
 }
+
+void displayWait() {
+	for (int i = 0; i < 4; ++i) {
+		HAL_Delay(2);
+		(*writeDigit[i])();
+		print_wait();
+	}
+}
+
+//READ KEY POLLING VERSION
+
 //char readKey(void) {
 //	HAL_GPIO_WritePin(R1_PORT, R1_PIN, GPIO_PIN_RESET);
 //	HAL_GPIO_WritePin(R2_PORT, R2_PIN, GPIO_PIN_SET);
@@ -635,18 +651,19 @@ void displayChar(char c) {
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	num--;
 	if (num == 0) {
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_9);
 		HAL_TIM_Base_Stop_IT(&htim6);
-		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 		HAL_Delay(100);
-		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 		HAL_Delay(100);
-		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 		HAL_Delay(100);
-		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 		HAL_Delay(100);
-		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 		HAL_Delay(100);
-		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 		for (int i = 0; i < 200; ++i) {
 			write_D1();
 			print_OFF();
