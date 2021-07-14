@@ -410,3 +410,4 @@ void print_OFF() // turning all 7 segments plus the decimal point off
 	  HAL_GPIO_WritePin(DIODE_PORT, DIODE_DP_PIN, GPIO_PIN_RESET);
 }
 
+void (*writeDigit[4])() = {&write_D1, &write_D2, &write_D3, &write_D4};

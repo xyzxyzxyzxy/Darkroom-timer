@@ -60,12 +60,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim6;
-
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
-void (*writeDigit[4])() = {&write_D1, &write_D2, &write_D3, &write_D4};
 
 GPIO_TypeDef* Cx_PORT[4] = {C1_PORT, C2_PORT, C3_PORT, C4_PORT};
 uint16_t Cx_PIN[4] = {C1_PIN, C2_PIN, C3_PIN, C4_PIN};
@@ -84,6 +81,7 @@ static char key;
 static char msg[50];
 static int rn;
 static int cn;
+static uint8_t pmode;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -111,6 +109,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
   key = '\0';
   num = 0;
+  pmode = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -141,6 +140,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   sprintf(msg, "%c[2K", 27);
   HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg), HAL_MAX_DELAY);
+
   HAL_Delay(200);
   t0 = HAL_GetTick();
 
@@ -149,6 +149,7 @@ int main(void)
 	 if (num > 0) {
 		 displayNumber(num);
 	 } else {
+		 //Display a series of dashes until a number is pressed
 		 displayWait();
 	 }
   }
@@ -359,6 +360,12 @@ static void MX_GPIO_Init(void)
 
 void keyCheck(char key) {
 	if ((int)key <= 58 && (int)key >= 48) { //a number between 0 and 9
+
+		  if (pmode > 0) {
+			  pmode = 0;
+			  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_9);
+		  }
+
 		  for (int i = 0; i < 50; ++i) {
 					  msg[i] = '\0';
 		  }
@@ -373,26 +380,33 @@ void keyCheck(char key) {
 		  for (int i = 0; i < 50; ++i) {
 				msg[i] = '\0';
 		  }
-		  if (key == 'C' && num > 0) {
-			  displayChar(key);
-			  HAL_Delay(500);
-			  key = '\0';
+		  if (key != '*') {
+			  if (key == 'C' && num > 0) {
+				  displayChar(key);
+				  HAL_Delay(500);
+				  key = '\0';
 
-			  HAL_TIM_Base_Start_IT(&htim6);
-			  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_9);
-			  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-			  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+				  HAL_TIM_Base_Start_IT(&htim6);
+				  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_9);
+				  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+				  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
 
-		  } else if (key == 'D' && num > 0) {
-			  if (num < 10) {
-				  num = 0;
+			  } else if (key == 'D' && num > 0) {
+				  if (num < 10) {
+					  num = 0;
+				  }
+				  num /= 10;
+				  num = floor(num);
+
+			  } else if (key == '#' && num > 0) {
+				  num += 0.5;
 			  }
-			  num /= 10;
-
-		  } else if (key == '#' && num > 0) {
-			  num += 0.5;
+		  } else if (key == '*') {
+			  //POSITIONING MODE
+			  num = 0;
+			  pmode = ~pmode;
+			  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_9);
 		  }
-
 		  sprintf(msg, "Key pressed: %c                   \r", key);
 		  HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg), HAL_MAX_DELAY);
 	  }
@@ -678,17 +692,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_9);
 		HAL_TIM_Base_Stop_IT(&htim6);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
-		HAL_Delay(100);
+		HAL_Delay(80);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
-		HAL_Delay(100);
+		HAL_Delay(80);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
-		HAL_Delay(100);
+		HAL_Delay(80);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
-		HAL_Delay(100);
+		HAL_Delay(80);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
-		HAL_Delay(100);
+		HAL_Delay(80);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
-		for (int i = 0; i < 200; ++i) {
+		for (int i = 0; i < 100; ++i) {
 			write_D1();
 			print_OFF();
 			HAL_Delay(2);
@@ -702,6 +716,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			print_d();
 			HAL_Delay(2);
 		}
+		num = 0;
 		//RE enable interrupts from keyboard
 		HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);

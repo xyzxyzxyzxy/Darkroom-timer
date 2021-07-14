@@ -104,4 +104,6 @@ void print_decimal(); // writing the decimal point
 
 void print_OFF(); // turning all 7 segments plus the decimal point off
 
+extern void (*writeDigit[4])();
+
 #endif /* SRC_7SEG_H_ */
