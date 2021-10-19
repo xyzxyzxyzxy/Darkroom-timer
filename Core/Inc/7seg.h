@@ -9,6 +9,7 @@
 #define SRC_7SEG_H_
 
 #include "stm32f4xx_hal.h"
+#include <math.h>
 
 #define D_PORT GPIOB
 #define D1_PIN GPIO_PIN_7
