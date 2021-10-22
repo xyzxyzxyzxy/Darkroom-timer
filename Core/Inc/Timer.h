@@ -437,11 +437,11 @@ class Timer {
 		}
 	}
 	void runImpl() {
-		 timer::execute();
-		 if (timer::getTime() > 0) {
-			 timer::displayTime();
+		 execute();
+		 if (getTime() > 0) {
+			 displayTime();
 		 } else {
-			 timer::displayWait();
+			 displayWait();
 		 }
 	}
 	bool debounce(uint16_t key_pressed) {
