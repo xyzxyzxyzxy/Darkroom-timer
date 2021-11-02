@@ -1,14 +1,13 @@
 /*
- * Timer.h
+ * Template class implementing the singleton pattern
  *
- *  Created on: Sep 4, 2021
- *      Author: ga
- */
+ * Maintains the state of the timer and implements its functions.
+ *
+ * */
 
 #ifndef TIMER_H_
 #define TIMER_H_
 #include "main.h"
-#include "Timer.h"
 #include "Keypad.h"
 #include "7seg.h"
 
@@ -19,6 +18,15 @@
 #define GPIO_BUZZER_PORT GPIOA
 #define GPIO_BUZZER_PIN GPIO_PIN_10
 
+/*
+ * Constructor is private, static functions call the private implementations over the single object instance
+ * template arguments can be defined when static functions are called,
+ * for simplicity a typedef can be used to state what template arguments one wants to use.
+ *
+ * Template arguments have to be two timer handle typedef, first is the "countdown" timer, second the "inactivity" timer.
+ * First timer generates UE every tenth of a second, inactivity timer can be set to generate UE every one second or less.
+ *
+ * */
 template <TIM_HandleTypeDef * htim, TIM_HandleTypeDef * htim_sleep>
 class Timer {
 
@@ -33,6 +41,10 @@ class Timer {
 	Timer() {}
 	Timer(const Timer&) = delete;
 	Timer& operator=(const Timer&) = delete;
+
+	/*
+	 * Resets timer to its default state when it was created
+	 * */
 	void resetTimer() {
 		if (isTimerActive) {
 			HAL_TIM_Base_Stop_IT(htim);
@@ -70,6 +82,7 @@ class Timer {
 		pmode = false;
 		isTimerActive = false;
 	}
+	/*Returns a reference to the object instance*/
 	static Timer& getTimer() {
 		static Timer timer_instance;
 		return timer_instance;
@@ -83,20 +96,30 @@ class Timer {
 	bool isPmodeActiveImpl() {
 		return pmode;
 	}
+	bool IisSleeping() {
+			return asleep;
+		}
+	void IsetSleepState(bool state) {
+		asleep = state;
+	}
+	/*
+	 * Updates time of inactivity, if
+	 * INACTIVITY_TIME threshold is reached then the MCU is put in stopMode
+	 * */
 	bool IinactivityTimeUpdate() {
 		inactivity_t++;
-		if (inactivity_t == 10) {
+		if (inactivity_t == INACTIVITY_TIME) {
 			inactivity_t = 0;
 			return true;
 		}
 		return false;
 	}
-	bool IisSleeping() {
-		return asleep;
-	}
-	void IsetSleepState(bool state) {
-		asleep = state;
-	}
+	/*
+	 * Updates current time based on previously inserted time and current digit
+	 *
+	 * Current time is then written to the display
+	 *
+	 * */
 	void IdisplayTime() {
 
 		int n = (int)(time * 10);
@@ -175,6 +198,10 @@ class Timer {
 			}
 		}
 	}
+	/*
+	 * Writes a character to the display, depending on what function key was pressed
+	 *
+	 * */
 	void IdisplayFunction() {
 		if ((int)key >= 65 && (int)key <= 68) {
 			for (int i = 0; i < 2; ++i) {
@@ -202,6 +229,9 @@ class Timer {
 			}
 		}
 	}
+	/*
+	 * Writes dashes on the display
+	 * */
 	void IdisplayWait() {
 		for (int i = 0; i < 4; ++i) {
 			HAL_Delay(2);
@@ -209,6 +239,12 @@ class Timer {
 			print_wait();
 		}
 	}
+	/*
+	 * Called when serving a keypad interrupt, decodes input by the user.
+	 * The pressed button column is first determined depending on which GPIO triggered the interrupt,
+	 * the corrisponding row is determined looping over the rows of the specific column.
+	 *
+	 * */
 	void IgetIn(uint16_t GPIO_Pin) {
 
 		//reset inactivity timer
@@ -218,11 +254,16 @@ class Timer {
 		int rn = 1;
 		int cn;
 
+		//The display is cleared to avoid glitch effects when pressing buttons
 		displayFlush();
 
-		//Toggle buzzer pin on
+		//Toggle buzzer pin on to produce a sound when a key is presseds
 		HAL_GPIO_TogglePin(GPIO_BUZZER_PORT, GPIO_BUZZER_PIN);
 
+		/*
+		 * If the MCU is in stopMode the current input is ignored, and the MCU returns to the default RUN mode
+		 *
+		 * */
 		if (asleep) goto exit;
 
 		if (GPIO_Pin == GPIO_PIN_11) {
@@ -235,6 +276,11 @@ class Timer {
 				HAL_GPIO_WritePin(Rx_PORT[rn-1], Rx_PIN[rn-1], GPIO_PIN_SET);
 			}
 
+			/*
+			 * Debounce function is called to determine if the key press is a valid press or just a bounce
+			 * input is accepted only if current press is a valid press, otherwise the input is ignored
+			 *
+			 * */
 			for (int i = 0; i < 15; ++i) {
 				if (debounce(HAL_GPIO_ReadPin(C1_PORT, C1_PIN))) {
 					valid_press = true;
@@ -311,11 +357,19 @@ class Timer {
 			HAL_GPIO_WritePin(R4_PORT, R4_PIN, GPIO_PIN_RESET);
 		}
 		if (valid_press) {
+			/*
+			 * The key corresponding to the row and column found is accessed through a matrix containing the symbols
+			 * */
 			key = keypad[rn][cn];
 		}
 		exit://Toggle buzzer pin off
 		HAL_GPIO_TogglePin(GPIO_BUZZER_PORT, GPIO_BUZZER_PIN);
 	}
+	/*
+	 * Updates current time subtracting a tenth of a second to the time
+	 * if time variable is less than or equal zero timer stops and relay opens circuit.
+	 *
+	 * */
 	void IupdateTime() {
 		time -= 0.1;
 		if (time <= 0) {
@@ -371,6 +425,10 @@ class Timer {
 			time = 0;
 		}
 	}
+	/*
+	 * Check what to do depending on the current input by the user
+	 *
+	 * */
 	void executeImpl() {
 		//IF ZERO NOTHING TO DO
 		if (key != '\0') {
@@ -380,9 +438,9 @@ class Timer {
 				return;
 			}
 
-			if(isTimerActive) return;
+			if(isTimerActive) return; //DO NOTHING IF TIMER IS CURRENTLY ACTIVE
 
-			//a number between 0 and 9
+			//a DIGIT
 			if ((int)key <= 58 && (int)key >= 48) {
 				  if (pmode == true) {
 					  pmode = false;
@@ -401,7 +459,7 @@ class Timer {
 				  if (time > 999) {
 					  time = (int)key-48;
 				  }
-			//a function key
+			//a FUNCTION KEY
 			} else {
 				  if (key == '*') {
 					  //POSITIONING MODE ON
@@ -436,24 +494,37 @@ class Timer {
 		key = '\0';
 		}
 	}
+	/*
+	 * main execution loop
+	 * 1 - check what to do depending on current input
+	 * 2 - if current time is greater than zero display the time
+	 * 	   else display dashes.
+	 * */
 	void runImpl() {
-		 execute();
-		 if (getTime() > 0) {
-			 displayTime();
+		 executeImpl();
+		 if (getTimeImpl() > 0) {
+			 IdisplayTime();
 		 } else {
-			 displayWait();
+			 IdisplayWait();
 		 }
 	}
+	/*Debounce algorithm implementation*/
 	bool debounce(uint16_t key_pressed) {
 		static uint16_t state = 0; // Current debounce status
 		state=(state<<1) | key_pressed | 0xe000;
 		if(state==0xffff)return true;
 		return false;
 	}
+	/*Stops the inactivity timer and resets inactivity time counter*/
 	void stopInactivityTimer() {
 		HAL_TIM_Base_Stop_IT(htim_sleep);
 		inactivity_t = 0;
 	}
+	/*
+	 * Starts the timer (countdown)
+	 * relay closes the circuit for the amount of time specified by the variable time
+	 *
+	 * */
 	void startTimer() {
 
 		//stop sleep timer
@@ -499,6 +570,11 @@ class Timer {
 		HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 	}
+	/*
+	 * Delete the last inserted digit
+	 * if only one digit was inserted the time is reset back to zero
+	 *
+	 * */
 	void deleteDigit() {
 		  if (time < 10) {
 			  time = 0;
@@ -506,9 +582,17 @@ class Timer {
 		  time /= 10;
 		  time = floor(time);
 	}
+	/*
+	 * Increments time by half a second
+	 *
+	 * */
 	void incrementTime() {
 		if (time > 0) time += 0.5;
 	}
+	/*
+	 * Turns off the display
+	 *
+	 * */
 	void displayFlush() {
 		write_D1();
 		print_OFF();
@@ -520,6 +604,10 @@ class Timer {
 		print_OFF();
 	}
 public:
+	/*
+	 * Static implementation of the private member functions
+	 *
+	 * */
 	static float getTime() {
 		return getTimer().getTimeImpl();
 	}

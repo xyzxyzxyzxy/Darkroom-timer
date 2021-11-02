@@ -1,9 +1,7 @@
 /*
- * Keypad.h
+ * Declarations and definitions for driving the keypad
  *
- *  Created on: Sep 6, 2021
- *      Author: ga
- */
+ * */
 
 #ifndef INC_KEYPAD_H_
 #define INC_KEYPAD_H_

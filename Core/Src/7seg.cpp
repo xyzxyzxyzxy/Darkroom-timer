@@ -1,12 +1,18 @@
 /*
- * 7seg.c
+ * 7-segment display driver functions
  *
- *  Created on: Jun 30, 2021
- *      Author: ga
- */
+ * The functions interact directly with the GPIOs the display is connected to
+ * by setting them HIGH or LOW
+ *
+ * */
+
 #include "7seg.h"
 
+//Array of function pointers used to simplify code in Timer.h getIn() function
 void (*writeDigit[4])() = {&write_D1, &write_D2, &write_D3, &write_D4};
+
+/*The following four functions are used to select
+ * the digit of the display to write on*/
 
 void write_D1()
 {
@@ -40,7 +46,7 @@ void write_D4()
 	HAL_GPIO_WritePin(D_PORT, D4_PIN, GPIO_PIN_RESET);
 }
 
-// the functions for writing characters to the display
+// Functions writing characters to the display
 void print_0() // writing 0
 {
   HAL_GPIO_WritePin(DIODE_PORT, DIODE_A_PIN, GPIO_PIN_SET);
@@ -402,7 +408,7 @@ void print_decimal() // writing the decimal point
 
 void print_OFF() // turning all 7 segments plus the decimal point off
 {
-	HAL_GPIO_WritePin(DIODE_PORT, DIODE_A_PIN, GPIO_PIN_RESET);
+	  HAL_GPIO_WritePin(DIODE_PORT, DIODE_A_PIN, GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(DIODE_PORT, DIODE_B_PIN, GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(DIODE_PORT, DIODE_C_PIN, GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(DIODE_PORT, DIODE_D_PIN, GPIO_PIN_RESET);

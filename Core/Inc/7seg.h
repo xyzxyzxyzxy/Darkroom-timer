@@ -1,15 +1,15 @@
 /*
- * 7seg.h
+ * Declarations for the 7-segment display driver
  *
- *  Created on: Jun 30, 2021
- *      Author: ga
- */
+ * */
 
 #ifndef SRC_7SEG_H_
 #define SRC_7SEG_H_
 
 #include "stm32f4xx_hal.h"
 #include <math.h>
+
+/*Definitions state which display input is connected to which GPIO on the dev board*/
 
 #define D_PORT GPIOB
 #define D1_PIN GPIO_PIN_7

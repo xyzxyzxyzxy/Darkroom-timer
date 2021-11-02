@@ -56,7 +56,10 @@ static void MX_TIM7_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+//Defines what the template arguments of the timer are
 typedef Timer<&htim6, &htim7> timer;
+
 /* USER CODE END 0 */
 
 /**
@@ -89,6 +92,7 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
+  //Start inactivity timer
   HAL_TIM_Base_Start_IT(&htim7);
   /* USER CODE END 2 */
 
@@ -97,6 +101,7 @@ int main(void)
 
   while (1)
   {
+	 //Create and run the timer
 	 timer::run();
   }
     /* USER CODE END WHILE */
@@ -315,7 +320,12 @@ void stopMode(void) {
 	  HAL_TIM_Base_Stop(&htim7);
 
 	  GPIO_InitTypeDef GPIO_InitStruct;
-	  /* Disable GPIOs to reduce power */
+
+	  /* Disable GPIOs to reduce power
+	   * only certain GPIOs are disabled,
+	   * relay and keypad need to maintain their state
+	   * when the MCU is in stop mode*/
+
 	  //HAL_GPIO_DeInit(GPIOE, GPIO_PIN_11);
 	  //HAL_GPIO_DeInit(GPIOE, GPIO_PIN_13);
 	  //HAL_GPIO_DeInit(GPIOE, GPIO_PIN_15);
@@ -348,8 +358,9 @@ void stopMode(void) {
 
 	  __HAL_RCC_PWR_CLK_ENABLE();
 
-	  /* Request to enter SLEEP mode */
+	  //set sleep state as TRUE while sleeping
 	  timer::setSleepState(true);
+	  /* Request to enter SLEEP mode */
 	  HAL_PWR_EnterSTOPMode(0, PWR_SLEEPENTRY_WFI);
 	  timer::setSleepState(false);
 
@@ -379,19 +390,24 @@ void stopMode(void) {
 	  /* Reinitialize timers */
 	  MX_TIM6_Init();
 	  MX_TIM7_Init();
+
 	  //Restart inactivity timer
 	  HAL_TIM_Base_Start(&htim7);
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	//Decode input from keypad
 	timer::getIn(GPIO_Pin);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim7) {
+		//update time of inactivity
 		if(timer::inactivityTimeUpdate()) {
+			/*if inactivity time threshold is reached, MCU goes in stop mode*/
 			stopMode();
 		}
 	} else if (htim == &htim6) {
+		//Update the remaining time when timer has started
 		timer::updateTime();
 	}
 }
